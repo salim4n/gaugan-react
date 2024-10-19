@@ -1,47 +1,26 @@
-import { useEffect, useRef, useState } from "react"
 import * as tf from "@tensorflow/tfjs"
 import { ChromePicker } from "react-color"
+import { GAUGAN_TAGS, CANVAS_HEIGHT, CANVAS_WIDTH } from "./sd"
+import useHook from "./hook"
+import { CSSProperties, useRef, useState } from "react"
 
-const gauganUrl =
-  "https://huggingface.co/salim4n/gaugan-tfjs/resolve/main/model.json"
-
-// Définir des tailles constantes pour les canvas
-const CANVAS_WIDTH = 256
-const CANVAS_HEIGHT = 256
-
-const GAUGAN_TAGS = [
-  "sky",
-  "cloud",
-  "grass",
-  "tree",
-  "mountain",
-  "water",
-  "earth",
-  "road",
-  "rock",
-  "sand",
-  "snow",
-  "building",
-  "bush",
-  "flower",
-  "sea",
-  "river",
-  "hill",
-  "forest",
-] as const
+type GauGANTag = (typeof GAUGAN_TAGS)[number]
 
 function App() {
-  const [gaugan, setGaugan] =
-    useState<tf.GraphModel<string | tf.io.IOHandler>>()
-  const [progress, setProgress] = useState(0)
-  const [loading, setLoading] = useState(false)
-  const [color, setColor] = useState("#ffffff")
+  const { gaugan, progress, loading, preHeating } = useHook()
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const [isDrawing, setIsDrawing] = useState(false)
-  const [preHeating, setPreHeating] = useState(false)
+  const [color, setColor] = useState<string>("#ffffff")
+  const [isDrawing, setIsDrawing] = useState<boolean>(false)
   const [generatedImage, setGeneratedImage] = useState<string | null>(null)
+  const [urlCss, setUrlCss] = useState<CSSProperties>({
+    color: "lightblue",
+    font: "small-caption",
+    fontSize: "20px",
+  })
+  const [heartCss, setHeartCss] = useState<CSSProperties>({})
+  const [selectedTags, setSelectedTags] = useState<GauGANTag[]>([])
 
-  const startDrawing = (event: React.MouseEvent) => {
+  const startDrawing = (event: React.MouseEvent): void => {
     const canvas = canvasRef.current
     const ctx = canvas?.getContext("2d")
     if (!ctx) return
@@ -60,16 +39,13 @@ function App() {
     ctx.moveTo(x, y)
   }
 
-  const stopDrawing = () => {
-    setIsDrawing(false)
-  }
+  const stopDrawing = (): void => setIsDrawing(false)
 
-  const draw = (event: React.MouseEvent) => {
+  const draw = (event: React.MouseEvent): void => {
     if (!isDrawing) return
     const canvas = canvasRef.current
     const ctx = canvas?.getContext("2d")
     if (!ctx) return
-
     // Ajuster les coordonnées en fonction de la taille du canvas
     if (!canvas) return
     const rect = canvas.getBoundingClientRect()
@@ -79,15 +55,24 @@ function App() {
     ctx.stroke()
   }
 
+  const toggleTag = (tag: GauGANTag) => {
+    setSelectedTags(prev =>
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    )
+  }
+
   const encodeGauGANTags = (): tf.Tensor2D => {
     const encoding = new Array(192).fill(0)
-    GAUGAN_TAGS.forEach((_, index) => {
-      encoding[index] = 1
+    selectedTags.forEach(tag => {
+      const index = GAUGAN_TAGS.indexOf(tag)
+      if (index !== -1) {
+        encoding[index] = 1
+      }
     })
     return tf.tensor2d([encoding], [1, 192])
   }
 
-  const generateImage = async () => {
+  const generateImage = async (): Promise<void> => {
     if (!canvasRef.current || !gaugan) return
 
     const canvas = canvasRef.current
@@ -138,35 +123,6 @@ function App() {
     tf.dispose([output, imageTensor])
   }
 
-  useEffect(() => {
-    ;(async () => {
-      tf.setBackend("webgl").then(() => console.log(tf.getBackend()))
-      setLoading(true)
-      const indexedDB = await window.indexedDB.databases()
-
-      if (indexedDB.some((db: IDBDatabaseInfo) => db.name === "tensorflowjs")) {
-        const model = await tf.loadGraphModel("indexeddb://gaugan-tfjs", {
-          onProgress: progress => setProgress(progress),
-        })
-        setPreHeating(true)
-        const tensor1 = tf.zeros([1, 192])
-        const tensor2 = tf.zeros([1, 256, 256, 18])
-        const pred = model.predict([tensor1, tensor2])
-        setPreHeating(false)
-        tf.dispose([tensor1, tensor2, pred])
-        setGaugan(model)
-        setLoading(false)
-      } else {
-        const model = await tf.loadGraphModel(gauganUrl, {
-          onProgress: progress => setProgress(progress),
-        })
-        await model.save("indexeddb://gaugan-tfjs")
-        setGaugan(model)
-        setLoading(false)
-      }
-    })()
-  }, [])
-
   if (preHeating) {
     return (
       <h1 style={{ color: "white", textAlign: "center" }}>
@@ -180,8 +136,70 @@ function App() {
       className="app-container"
       style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
       <h1 style={{ color: "white", textAlign: "center" }}>
-        GauGAN TensorFlow.js
+        Gaugan - React - Tensorflow.js
       </h1>
+      <p style={{ textAlign: "center", color: "white" }}>
+        A generative art tool for creating unique and beautiful images.
+      </p>
+      <p
+        style={{
+          textAlign: "center",
+          font: "small-caps",
+          color: "white",
+        }}>
+        Made with{" "}
+        <span
+          style={heartCss}
+          onMouseEnter={() => {
+            setHeartCss({
+              fontSize: "30px",
+              transform: "rotate(1.5turn)",
+              transition: "all 0.2s ease-in-out",
+            })
+          }}
+          onMouseLeave={() => {
+            setHeartCss({
+              fontSize: "20px",
+              transform: "rotate(1turn)",
+              transition: "all 3s ease-in-out",
+            })
+          }}>
+          ❤️
+        </span>{" "}
+        by{" "}
+        <a
+          onMouseEnter={() => {
+            setUrlCss({
+              color: "gold",
+              font: "icon",
+              fontSize: "30px",
+              transition: "all 0.2s ease-in-out",
+            })
+            setHeartCss({
+              fontSize: "30px",
+              transform: "scale(1.5)",
+              transition: "all 0.2s ease-in-out",
+            })
+          }}
+          onMouseLeave={() => {
+            setUrlCss({
+              color: "lightblue",
+              fontSize: "20px",
+              font: "small-caption",
+              transition: "all 0.2s ease-in-out",
+            })
+            setHeartCss({
+              fontSize: "20px",
+              transform: "scale(1)",
+              transition: "all 3s ease-in-out",
+            })
+          }}
+          href="https://github.com/salim4n"
+          target="_blank"
+          style={urlCss}>
+          Salim Laimeche
+        </a>
+      </p>
 
       {loading && (
         <div style={{ textAlign: "center", marginTop: "20px" }}>
@@ -220,6 +238,34 @@ function App() {
           />
         </div>
       </div>
+      {/* Tag Selection */}
+      <div
+        style={{
+          marginTop: "20px",
+          textAlign: "center",
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "10px",
+          justifyContent: "center",
+          padding: "20px",
+        }}>
+        {GAUGAN_TAGS.map(tag => (
+          <button
+            key={tag}
+            onClick={() => toggleTag(tag)}
+            style={{
+              padding: "8px 16px",
+              borderRadius: "20px",
+              border: "none",
+              backgroundColor: selectedTags.includes(tag) ? "#e74c3c" : "#555",
+              color: "white",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+            }}>
+            {tag}
+          </button>
+        ))}
+      </div>
 
       <div style={{ textAlign: "center", marginTop: "20px" }}>
         <button
@@ -240,7 +286,7 @@ function App() {
         style={{
           display: "flex",
           justifyContent: "center",
-          marginTop: "30px",
+          margin: "20px auto",
         }}>
         <div style={{ textAlign: "center", marginTop: "30px" }}>
           <canvas
@@ -257,14 +303,18 @@ function App() {
               borderRadius: "10px",
               width: "512px",
               height: "512px",
-              imageRendering: "pixelated", // Garde les pixels nets lors du redimensionnement
+              imageRendering: "pixelated",
             }}
           />
         </div>
 
         {generatedImage && (
-          <div style={{ marginTop: "30px", textAlign: "center" }}>
-            <h3 style={{ color: "white" }}>Generated Image:</h3>
+          <div
+            style={{
+              marginTop: "30px",
+              textAlign: "center",
+              marginLeft: "50px",
+            }}>
             <img
               src={generatedImage}
               alt="Generated"
@@ -272,8 +322,7 @@ function App() {
                 width: "512px", // Double size for display
                 height: "512px", // Double size for display
                 borderRadius: "10px",
-                boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
-                imageRendering: "pixelated", // Garde les pixels nets lors du redimensionnement
+                imageRendering: "pixelated",
               }}
             />
           </div>
