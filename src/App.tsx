@@ -339,50 +339,43 @@ function App() {
         </div>
         <div
           style={{
-            textAlign: "center",
-            marginTop: "20px",
-            display: "flex",
-            justifyContent: "center",
-            flexDirection: "column",
+            display: "flex", // Utilisation de flexbox pour aligner horizontalement
+            justifyContent: "space-evenly", // Espacement égal entre les éléments
+            alignItems: "center", // Alignement vertical centré
+            marginTop: "20px", // Espacement en haut
+            gap: "20px", // Espace entre le canevas et l'image générée
           }}>
-          <div style={{ textAlign: "center", marginTop: "30px" }}>
-            <canvas
-              ref={canvasRef}
-              width={CANVAS_WIDTH}
-              height={CANVAS_HEIGHT}
-              onMouseDown={startDrawing}
-              onMouseMove={draw}
-              onMouseUp={stopDrawing}
-              onMouseLeave={stopDrawing}
+          {/* Canevas pour dessiner */}
+          <canvas
+            ref={canvasRef}
+            width={CANVAS_WIDTH}
+            height={CANVAS_HEIGHT}
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+            style={{
+              backgroundColor: TAG_COLORS[selectedBackground].color,
+              borderRadius: "10px",
+              width: "512px",
+              height: "512px",
+              imageRendering: "pixelated",
+              cursor: "crosshair",
+            }}
+          />
+
+          {/* Image générée */}
+          {generatedImage && (
+            <img
+              src={generatedImage}
+              alt="Generated"
               style={{
-                backgroundColor: TAG_COLORS[selectedBackground].color,
-                borderRadius: "10px",
-                width: "512px",
+                width: "512px", // Dimensions identiques au canevas pour un alignement cohérent
                 height: "512px",
+                borderRadius: "10px",
                 imageRendering: "pixelated",
-                cursor: "crosshair",
               }}
             />
-          </div>
-
-          {generatedImage && (
-            <div
-              style={{
-                marginTop: "30px",
-                textAlign: "center",
-                marginLeft: "50px",
-              }}>
-              <img
-                src={generatedImage}
-                alt="Generated"
-                style={{
-                  width: "512px", // Double size for display
-                  height: "512px", // Double size for display
-                  borderRadius: "10px",
-                  imageRendering: "pixelated",
-                }}
-              />
-            </div>
           )}
         </div>
       </div>
