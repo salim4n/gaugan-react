@@ -1,7 +1,7 @@
 import * as tf from "@tensorflow/tfjs"
-import { CANVAS_HEIGHT, CANVAS_WIDTH, GauGANTag, TAG_COLORS } from "./sd"
 import useHook from "./hook"
 import { CSSProperties, useRef, useState } from "react"
+import { CANVAS_HEIGHT, CANVAS_WIDTH, GauGANTag, TAG_COLORS } from "./sd"
 
 function App() {
   const { gaugan, progress, loading, preHeating } = useHook()
@@ -17,8 +17,7 @@ function App() {
   const [currentColor, setCurrentColor] = useState<string>(
     TAG_COLORS.grass.color
   )
-  const [selectedBackground, _setSelectedBackground] =
-    useState<GauGANTag>("sky")
+  const [selectedBackground, setSelectedBackground] = useState<GauGANTag>("sky")
   const [currentTag, setCurrentTag] = useState<GauGANTag>("grass")
   const [activePixels, setActivePixels] = useState<Set<GauGANTag>>(new Set())
 
@@ -61,6 +60,7 @@ function App() {
     const canvas = canvasRef.current
     const ctx = canvas?.getContext("2d")
     if (!ctx) return
+    setSelectedBackground("sky")
     ctx.fillStyle = TAG_COLORS[selectedBackground].color
     if (!canvas) return
     ctx.fillRect(0, 0, canvas.width, canvas.height)
