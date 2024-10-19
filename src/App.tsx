@@ -1,15 +1,11 @@
 import * as tf from "@tensorflow/tfjs"
-import { ChromePicker } from "react-color"
-import { GAUGAN_TAGS, CANVAS_HEIGHT, CANVAS_WIDTH } from "./sd"
+import { CANVAS_HEIGHT, CANVAS_WIDTH, GauGANTag, TAG_COLORS } from "./sd"
 import useHook from "./hook"
 import { CSSProperties, useRef, useState } from "react"
-
-type GauGANTag = (typeof GAUGAN_TAGS)[number]
 
 function App() {
   const { gaugan, progress, loading, preHeating } = useHook()
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const [color, setColor] = useState<string>("#ffffff")
   const [isDrawing, setIsDrawing] = useState<boolean>(false)
   const [generatedImage, setGeneratedImage] = useState<string | null>(null)
   const [urlCss, setUrlCss] = useState<CSSProperties>({
@@ -18,7 +14,13 @@ function App() {
     fontSize: "20px",
   })
   const [heartCss, setHeartCss] = useState<CSSProperties>({})
-  const [selectedTags, setSelectedTags] = useState<GauGANTag[]>([])
+  const [currentColor, setCurrentColor] = useState<string>(
+    TAG_COLORS.grass.color
+  )
+  const [selectedBackground, _setSelectedBackground] =
+    useState<GauGANTag>("sky")
+  const [currentTag, setCurrentTag] = useState<GauGANTag>("grass")
+  const [activePixels, setActivePixels] = useState<Set<GauGANTag>>(new Set())
 
   const startDrawing = (event: React.MouseEvent): void => {
     const canvas = canvasRef.current
@@ -26,27 +28,27 @@ function App() {
     if (!ctx) return
 
     setIsDrawing(true)
-    ctx.strokeStyle = color
+    ctx.strokeStyle = currentColor
     ctx.lineWidth = 5
     ctx.lineJoin = "round"
     ctx.lineCap = "round"
     ctx.beginPath()
-    // Ajuster les coordonnées en fonction de la taille du canvas
     if (!canvas) return
     const rect = canvas.getBoundingClientRect()
     const x = (event.clientX - rect.left) * (canvas.width / rect.width)
     const y = (event.clientY - rect.top) * (canvas.height / rect.height)
     ctx.moveTo(x, y)
+    setActivePixels(prev => new Set([...prev, currentTag]))
   }
 
   const stopDrawing = (): void => setIsDrawing(false)
 
-  const draw = (event: React.MouseEvent): void => {
+  const draw = (event: React.MouseEvent) => {
     if (!isDrawing) return
     const canvas = canvasRef.current
     const ctx = canvas?.getContext("2d")
     if (!ctx) return
-    // Ajuster les coordonnées en fonction de la taille du canvas
+
     if (!canvas) return
     const rect = canvas.getBoundingClientRect()
     const x = (event.clientX - rect.left) * (canvas.width / rect.width)
@@ -55,17 +57,30 @@ function App() {
     ctx.stroke()
   }
 
-  const toggleTag = (tag: GauGANTag) => {
-    setSelectedTags(prev =>
-      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-    )
+  const clearCanvas = () => {
+    const canvas = canvasRef.current
+    const ctx = canvas?.getContext("2d")
+    if (!ctx) return
+    ctx.fillStyle = TAG_COLORS[selectedBackground].color
+    if (!canvas) return
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    setActivePixels(new Set())
+  }
+
+  const selectTag = (tag: GauGANTag) => {
+    setCurrentTag(tag)
+    setCurrentColor(TAG_COLORS[tag].color)
   }
 
   const encodeGauGANTags = (): tf.Tensor2D => {
     const encoding = new Array(192).fill(0)
-    selectedTags.forEach(tag => {
-      const index = GAUGAN_TAGS.indexOf(tag)
-      if (index !== -1) {
+    const tags = Array.from(activePixels)
+    // Ajout du tag de fond
+    tags.push(selectedBackground)
+    tags.forEach(tag => {
+      if (Object.keys(TAG_COLORS).includes(tag)) {
+        console.log(TAG_COLORS[tag])
+        const index = Object.keys(TAG_COLORS).indexOf(tag)
         encoding[index] = 1
       }
     })
@@ -74,7 +89,6 @@ function App() {
 
   const generateImage = async (): Promise<void> => {
     if (!canvasRef.current || !gaugan) return
-
     const canvas = canvasRef.current
     const ctx = canvas.getContext("2d")
     if (!ctx) return
@@ -96,7 +110,7 @@ function App() {
       return tf.concat([imageChannels, remainingChannels], 3)
     })
 
-    const output = (await gaugan.predict([tensor1, tensor2])) as tf.Tensor
+    const output = gaugan.predict([tensor1, tensor2]) as tf.Tensor
     tf.dispose([tensor1, tensor2, inputTensor, tagsTensor])
 
     const imageTensor = output
@@ -217,116 +231,160 @@ function App() {
 
       <div
         style={{
-          marginTop: "30px",
-          textAlign: "center",
-          padding: "20px",
           display: "flex",
-          justifyContent: "center",
+          flexDirection: "column",
+          alignItems: "center",
         }}>
         <div
           style={{
-            display: "inline-block",
-            padding: "10px",
-            backgroundColor: "#fff",
-            cursor: "crosshair",
+            marginTop: "30px",
+            textAlign: "center",
+            padding: "20px",
+            display: "flex",
+            justifyContent: "center",
+            borderRadius: "10px",
+            boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+            margin: "20px auto",
+            maxHeight: "300px",
           }}>
-          <ChromePicker
-            color={color}
-            onChangeComplete={(newColor: { hex: string }) =>
-              setColor(newColor.hex)
-            }
-          />
-        </div>
-      </div>
-      {/* Tag Selection */}
-      <div
-        style={{
-          marginTop: "20px",
-          textAlign: "center",
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "10px",
-          justifyContent: "center",
-          padding: "20px",
-        }}>
-        {GAUGAN_TAGS.map(tag => (
-          <button
-            key={tag}
-            onClick={() => toggleTag(tag)}
-            style={{
-              padding: "8px 16px",
-              borderRadius: "20px",
-              border: "none",
-              backgroundColor: selectedTags.includes(tag) ? "#e74c3c" : "#555",
-              color: "white",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-            }}>
-            {tag}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ textAlign: "center", marginTop: "20px" }}>
-        <button
-          onClick={generateImage}
-          style={{
-            backgroundColor: "#e74c3c",
-            color: "white",
-            padding: "10px 20px",
-            border: "none",
-            borderRadius: "5px",
-            cursor: "pointer",
-            fontSize: "16px",
-          }}>
-          Generate Image
-        </button>
-      </div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          margin: "20px auto",
-        }}>
-        <div style={{ textAlign: "center", marginTop: "30px" }}>
-          <canvas
-            ref={canvasRef}
-            width={CANVAS_WIDTH}
-            height={CANVAS_HEIGHT}
-            onMouseDown={startDrawing}
-            onMouseMove={draw}
-            onMouseUp={stopDrawing}
-            onMouseLeave={stopDrawing}
-            style={{
-              cursor: "crosshair",
-              backgroundColor: "white",
-              borderRadius: "10px",
-              width: "512px",
-              height: "512px",
-              imageRendering: "pixelated",
-            }}
-          />
-        </div>
-
-        {generatedImage && (
           <div
             style={{
-              marginTop: "30px",
-              textAlign: "center",
-              marginLeft: "50px",
+              display: "inline-block",
+              padding: "10px",
+              backgroundColor: "gray",
             }}>
-            <img
-              src={generatedImage}
-              alt="Generated"
+            {/* Color Palette */}
+            <div
               style={{
-                width: "512px", // Double size for display
-                height: "512px", // Double size for display
+                marginTop: "20px",
+                textAlign: "center",
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "10px",
+                justifyContent: "center",
+                padding: "20px",
                 borderRadius: "10px",
+              }}>
+              {Object.entries(TAG_COLORS).map(([tag, { color, label }]) => (
+                <div
+                  key={tag}
+                  onClick={() => selectTag(tag as GauGANTag)}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "5px",
+                    cursor: "pointer",
+                    color: "black",
+                  }}>
+                  <div
+                    style={{
+                      width: "30px",
+                      height: "30px",
+                      backgroundColor: color,
+                      border:
+                        currentTag === tag
+                          ? "3px solid white"
+                          : "1px solid #666",
+                      borderRadius: "5px",
+                    }}
+                  />
+                  <span
+                    style={{
+                      color: "white",
+                      fontSize: "12px",
+                      opacity: activePixels.has(tag as GauGANTag) ? 1 : 0.7,
+                    }}>
+                    {label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div style={{ textAlign: "center", marginTop: "20px" }}>
+          <button
+            onClick={generateImage}
+            style={{
+              backgroundColor: "#e74c3c",
+              color: "white",
+              padding: "10px 20px",
+              border: "none",
+              borderRadius: "5px",
+              cursor: "pointer",
+              fontSize: "16px",
+            }}>
+            Generate Image
+          </button>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              margin: "20px auto",
+            }}>
+            <button
+              onClick={clearCanvas}
+              style={{
+                backgroundColor: "#555",
+                color: "white",
+                padding: "10px 20px",
+                border: "none",
+                borderRadius: "5px",
+                cursor: "pointer",
+                fontSize: "16px",
+              }}>
+              Clear Canvas
+            </button>
+          </div>
+        </div>
+        <div
+          style={{
+            textAlign: "center",
+            marginTop: "20px",
+            display: "flex",
+            justifyContent: "center",
+            flexDirection: "column",
+          }}>
+          <div style={{ textAlign: "center", marginTop: "30px" }}>
+            <canvas
+              ref={canvasRef}
+              width={CANVAS_WIDTH}
+              height={CANVAS_HEIGHT}
+              onMouseDown={startDrawing}
+              onMouseMove={draw}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+              style={{
+                backgroundColor: TAG_COLORS[selectedBackground].color,
+                borderRadius: "10px",
+                width: "512px",
+                height: "512px",
                 imageRendering: "pixelated",
+                cursor: "crosshair",
               }}
             />
           </div>
-        )}
+
+          {generatedImage && (
+            <div
+              style={{
+                marginTop: "30px",
+                textAlign: "center",
+                marginLeft: "50px",
+              }}>
+              <img
+                src={generatedImage}
+                alt="Generated"
+                style={{
+                  width: "512px", // Double size for display
+                  height: "512px", // Double size for display
+                  borderRadius: "10px",
+                  imageRendering: "pixelated",
+                }}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
