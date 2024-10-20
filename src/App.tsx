@@ -37,7 +37,7 @@ function App() {
 
     setIsDrawing(true)
     ctx.strokeStyle = currentColor
-    ctx.lineWidth = 5
+    ctx.lineWidth = 20
     ctx.lineJoin = "round"
     ctx.lineCap = "round"
     ctx.beginPath()
@@ -396,6 +396,7 @@ function App() {
               height: "512px",
               imageRendering: "pixelated",
               cursor: "crosshair",
+              border: "1px solid black",
             }}
           />
 
