@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import * as tf from "@tensorflow/tfjs"
 import { gauganUrl } from "./sd"
 
-export default function useHook() {
+export default function useGaugan() {
   const [gaugan, setGaugan] =
     useState<tf.GraphModel<string | tf.io.IOHandler>>()
   const [progress, setProgress] = useState<number>(0)

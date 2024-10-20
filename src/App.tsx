@@ -1,11 +1,19 @@
 import * as tf from "@tensorflow/tfjs"
-import useHook from "./hook"
+
 import { CSSProperties, useRef, useState } from "react"
-import { CANVAS_HEIGHT, CANVAS_WIDTH, GauGANTag, TAG_COLORS } from "./sd"
+import {
+  backgrounds,
+  BACKGROUNDS_URL,
+  CANVAS_HEIGHT,
+  CANVAS_WIDTH,
+  GauGANTag,
+  TAG_COLORS,
+} from "./sd"
+import useGaugan from "./use-gaugan"
 
 function App() {
-  const { gaugan, progress, loading, preHeating } = useHook()
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const { gaugan, progress, loading, preHeating } = useGaugan()
+  const canvasRef = useRef<HTMLCanvasElement | null>(null) // Référence vers le canvas
   const [isDrawing, setIsDrawing] = useState<boolean>(false)
   const [generatedImage, setGeneratedImage] = useState<string | null>(null)
   const [urlCss, setUrlCss] = useState<CSSProperties>({
@@ -17,7 +25,8 @@ function App() {
   const [currentColor, setCurrentColor] = useState<string>(
     TAG_COLORS.grass.color
   )
-  const [selectedBackground, setSelectedBackground] = useState<GauGANTag>("sky")
+  const [selectedBackground, setSelectedBackground] =
+    useState<backgrounds>("/sky.jpg")
   const [currentTag, setCurrentTag] = useState<GauGANTag>("grass")
   const [activePixels, setActivePixels] = useState<Set<GauGANTag>>(new Set())
 
@@ -59,11 +68,18 @@ function App() {
   const clearCanvas = () => {
     const canvas = canvasRef.current
     const ctx = canvas?.getContext("2d")
-    if (!ctx) return
-    setSelectedBackground("sky")
-    ctx.fillStyle = TAG_COLORS[selectedBackground].color
-    if (!canvas) return
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    if (!ctx || !canvas) return
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+    // Création d'un nouvel objet Image
+    const backgroundImage = new Image()
+    backgroundImage.src = selectedBackground
+
+    // Dessin de l'image de fond une fois qu'elle est chargée
+    backgroundImage.onload = () => {
+      ctx.drawImage(backgroundImage, 0, 0)
+    }
+
     setActivePixels(new Set())
   }
 
@@ -76,7 +92,6 @@ function App() {
     const encoding = new Array(192).fill(0)
     const tags = Array.from(activePixels)
     // Ajout du tag de fond
-    tags.push(selectedBackground)
     tags.forEach(tag => {
       if (Object.keys(TAG_COLORS).includes(tag)) {
         console.log(TAG_COLORS[tag])
@@ -251,7 +266,8 @@ function App() {
             style={{
               display: "inline-block",
               padding: "10px",
-              backgroundColor: "gray",
+              backgroundColor: "darkslategray",
+              borderRadius: "5px",
             }}>
             {/* Color Palette */}
             <div
@@ -298,6 +314,26 @@ function App() {
                     {label}
                   </span>
                 </div>
+              ))}
+            </div>
+            <hr />
+            <div>
+              <p>Backgrounds</p>
+              {BACKGROUNDS_URL.map(background => (
+                <img
+                  key={background}
+                  src={background}
+                  alt="Background"
+                  style={{
+                    width: "100px",
+                    height: "100px",
+                    borderRadius: "5px",
+                    imageRendering: "pixelated",
+                    cursor: "pointer",
+                    marginRight: "10px",
+                  }}
+                  onClick={() => setSelectedBackground(background)}
+                />
               ))}
             </div>
           </div>
@@ -355,7 +391,6 @@ function App() {
             onMouseUp={stopDrawing}
             onMouseLeave={stopDrawing}
             style={{
-              backgroundColor: TAG_COLORS[selectedBackground].color,
               borderRadius: "10px",
               width: "512px",
               height: "512px",
